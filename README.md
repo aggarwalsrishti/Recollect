@@ -102,18 +102,6 @@ Potential improvements include:
 - Export and backup options.
 - UI and accessibility improvements.
 
-## 🤝 Contributing
-
-Contributions, suggestions, and bug reports are welcome.
-
-1. Fork the repository.
-2. Create a feature branch.
-3. Make your changes.
-4. Submit a pull request describing your improvements.
-
-## 📄 License
-
-No license has been specified yet. Add a license file before allowing others to reuse, modify, or distribute this project.
 
 ---
 
