@@ -1,0 +1,36 @@
+# Gradle and Android build outputs
+.gradle/
+**/.gradle/
+build/
+**/build/
+.kotlin/
+
+# Android Studio and machine-specific files
+.idea/
+*.iml
+local.properties
+
+# Generated files
+captures/
+.externalNativeBuild/
+.cxx/
+*.log
+
+# Firebase client config (keep locally; do not commit to public repo)
+google-services.json
+**/google-services.json
+
+# Local secrets and signing files
+.env
+.env.*
+!.env.example
+secrets.properties
+key.properties
+*.jks
+*.keystore
+service-account*.json
+firebase-adminsdk*.json
+
+# OS files
+.DS_Store
+Thumbs.db
