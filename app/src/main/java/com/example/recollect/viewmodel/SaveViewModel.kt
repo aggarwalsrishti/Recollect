@@ -1,3 +1,4 @@
+
 package com.example.recollect.viewmodel
 
 import android.app.Application
@@ -12,7 +13,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -29,44 +29,44 @@ class SaveViewModel(
     private val cloudRepository = CloudRepository()
 
     private val ownerUid = MutableStateFlow(
-        auth.currentUser?.uid ?: "LOCAL"
+        auth.currentUser?.uid ?: LOCAL
     )
 
     private val _statusMessage = MutableStateFlow("")
     val statusMessage = _statusMessage.asStateFlow()
 
+    companion object {
+        private const val SYNCED = "SYNCED"
+        private const val PENDING = "PENDING"
+        private const val FAILED = "FAILED"
+        private const val LOCAL = "LOCAL"
+    }
+
+    /*
+     * Firebase immediately notifies this listener of the current
+     * authentication state. This handles both an existing session
+     * and later sign-in/sign-out changes.
+     */
     private val authListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
-        val uid = firebaseAuth.currentUser?.uid ?: "LOCAL"
+        val uid = firebaseAuth.currentUser?.uid ?: LOCAL
         ownerUid.value = uid
 
-        if (uid != "LOCAL") {
+        if (uid != LOCAL) {
             viewModelScope.launch {
                 try {
-                    repository.assignUnownedItems(uid)
-                    syncPendingItems()
+                    refreshCloudItems()
                 } catch (e: Exception) {
                     _statusMessage.value =
-                        "Could not prepare sync: ${e.message ?: "Please try again."}"
+                        "Could not restore cloud items: " +
+                                (e.message ?: "Please try again.")
                 }
             }
         }
     }
 
     init {
+        // The listener also handles users who are already signed in.
         auth.addAuthStateListener(authListener)
-
-        val uid = auth.currentUser?.uid
-        if (uid != null) {
-            viewModelScope.launch {
-                try {
-                    repository.assignUnownedItems(uid)
-                    syncPendingItems()
-                } catch (e: Exception) {
-                    _statusMessage.value =
-                        "Could not prepare local items: ${e.message ?: "Please try again."}"
-                }
-            }
-        }
     }
 
     val allItems = ownerUid
@@ -79,13 +79,6 @@ class SaveViewModel(
             emptyList()
         )
 
-    companion object {
-        private const val SYNCED = "SYNCED"
-        private const val PENDING = "PENDING"
-        private const val FAILED = "FAILED"
-        private const val LOCAL = "LOCAL"
-    }
-
     fun addItem(
         title: String,
         content: String,
@@ -96,7 +89,6 @@ class SaveViewModel(
         viewModelScope.launch {
             val uid = auth.currentUser?.uid ?: LOCAL
 
-            // Save to Room before attempting any network operation.
             val item = SaveItem(
                 title = title,
                 content = content,
@@ -107,8 +99,7 @@ class SaveViewModel(
             )
 
             try {
-                val generatedId = repository.insert(item)
-                val savedItem = item.copy(id = generatedId.toInt())
+                repository.insert(item)
 
                 if (cloud && uid != LOCAL) {
                     _statusMessage.value =
@@ -122,7 +113,8 @@ class SaveViewModel(
                 }
             } catch (e: Exception) {
                 _statusMessage.value =
-                    "Could not save item locally: ${e.message ?: "Please try again."}"
+                    "Could not save item locally: " +
+                            (e.message ?: "Please try again.")
             }
         }
     }
@@ -157,7 +149,8 @@ class SaveViewModel(
                 }
             } catch (e: Exception) {
                 _statusMessage.value =
-                    "Could not update item: ${e.message ?: "Please try again."}"
+                    "Could not update item: " +
+                            (e.message ?: "Please try again.")
             }
         }
     }
@@ -168,16 +161,15 @@ class SaveViewModel(
 
             try {
                 if (item.cloudId.isNullOrBlank()) {
-                    // It has never been uploaded, so no cloud deletion is needed.
                     repository.delete(item)
                     _statusMessage.value = "Item deleted."
                 } else {
-                    // Keep a tombstone in Room until cloud deletion succeeds.
                     val deletedItem = item.copy(
                         isDeleted = true,
                         updatedAt = System.currentTimeMillis(),
                         syncStatus = PENDING
                     )
+
                     repository.update(deletedItem)
 
                     if (uid != LOCAL) {
@@ -189,7 +181,8 @@ class SaveViewModel(
                 }
             } catch (e: Exception) {
                 _statusMessage.value =
-                    "Could not delete item: ${e.message ?: "Please try again."}"
+                    "Could not delete item: " +
+                            (e.message ?: "Please try again.")
             }
         }
     }
@@ -209,32 +202,38 @@ class SaveViewModel(
             try {
                 repository.update(updatedItem)
 
-                _statusMessage.value = if (updatedItem.isArchived) {
-                    "Item archived locally."
-                } else {
-                    "Item restored locally."
-                }
+                _statusMessage.value =
+                    if (updatedItem.isArchived) {
+                        "Item archived locally."
+                    } else {
+                        "Item restored locally."
+                    }
 
                 if (updatedItem.syncStatus == PENDING) {
                     syncPendingItems()
                 }
             } catch (e: Exception) {
                 _statusMessage.value =
-                    "Could not update archive status: ${e.message ?: "Please try again."}"
+                    "Could not update archive status: " +
+                            (e.message ?: "Please try again.")
             }
         }
     }
 
     suspend fun saveItemToCloud(item: SaveItem): String {
         val uid = auth.currentUser?.uid
-            ?: throw IllegalStateException("Please sign in to save items to cloud.")
+            ?: throw IllegalStateException(
+                "Please sign in to save items to cloud."
+            )
 
         if (
             item.ownerUid.isNotBlank() &&
             item.ownerUid != LOCAL &&
             item.ownerUid != uid
         ) {
-            throw IllegalStateException("You cannot upload another user's item.")
+            throw IllegalStateException(
+                "You cannot upload another user's item."
+            )
         }
 
         val pendingItem = item.copy(
@@ -243,7 +242,6 @@ class SaveViewModel(
             syncStatus = PENDING
         )
 
-        // Persist the pending change first.
         repository.update(pendingItem)
 
         val cloudId = cloudRepository.saveItem(pendingItem)
@@ -260,9 +258,9 @@ class SaveViewModel(
         return result
     }
 
-    /**
-     * Public retry entry point.
-     * Call this after a connection is restored or from a Retry button.
+    /*
+     * Public retry entry point for a Retry button or a restored
+     * internet connection.
      */
     fun retryPendingSync() {
         viewModelScope.launch {
@@ -270,9 +268,9 @@ class SaveViewModel(
         }
     }
 
-    /**
-     * Processes pending uploads, updates and deletions.
-     * Failed operations remain in Room for another attempt.
+    /*
+     * Upload pending changes, and process pending cloud deletions.
+     * Failed operations remain available for a later retry.
      */
     private suspend fun syncPendingItems() {
         val uid = auth.currentUser?.uid ?: return
@@ -322,17 +320,25 @@ class SaveViewModel(
             _statusMessage.value = when {
                 failed == 0 ->
                     "Sync complete. $succeeded item(s) synced."
+
                 succeeded == 0 ->
-                    "Sync failed for $failed item(s). Your local changes are saved; retry when connected."
+                    "Sync failed for $failed item(s). " +
+                            "Your local changes are saved; retry when connected."
+
                 else ->
                     "$succeeded item(s) synced; $failed failed and will need retrying."
             }
         } catch (e: Exception) {
             _statusMessage.value =
-                "Sync could not run: ${e.message ?: "Check your connection and retry."}"
+                "Sync could not run: " +
+                        (e.message ?: "Check your connection and retry.")
         }
     }
 
+    /*
+     * Download cloud items and merge them into Room.
+     * Pending local changes are not overwritten by cloud data.
+     */
     suspend fun refreshCloudItems(): String {
         val uid = auth.currentUser?.uid
             ?: throw IllegalStateException("Please sign in first.")
@@ -356,7 +362,7 @@ class SaveViewModel(
                 continue
             }
 
-            // Never replace a pending or failed local edit with cloud data.
+            // Preserve pending changes and local deletion tombstones.
             if (
                 existing.syncStatus == PENDING ||
                 existing.syncStatus == FAILED ||
@@ -365,7 +371,8 @@ class SaveViewModel(
                 continue
             }
 
-            val cloudIsNewer = cloudItem.updatedAt > existing.updatedAt
+            val cloudIsNewer =
+                cloudItem.updatedAt > existing.updatedAt
 
             if (cloudIsNewer) {
                 repository.update(
@@ -377,17 +384,17 @@ class SaveViewModel(
                 )
                 updated++
             } else if (existing.updatedAt > cloudItem.updatedAt) {
-                // Local copy is newer; queue it for upload.
                 repository.update(
                     existing.copy(syncStatus = PENDING)
                 )
             }
         }
 
-        // Try to send any local changes discovered during refresh.
+        // Upload local pending changes found during the merge.
         syncPendingItems()
 
-        val result = "Cloud refresh complete: $added added, $updated updated."
+        val result =
+            "Cloud refresh complete: $added added, $updated updated."
         _statusMessage.value = result
         return result
     }
