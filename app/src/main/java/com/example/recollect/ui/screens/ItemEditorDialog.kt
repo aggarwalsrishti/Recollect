@@ -26,34 +26,41 @@ fun ItemEditorDialog(
 ) {
     val initialSharedText = sharedText?.trim().orEmpty()
 
-    val sharedIsUrl = initialSharedText.startsWith(
-        "https://",
-        ignoreCase = true
-    ) || initialSharedText.startsWith(
-        "http://",
-        ignoreCase = true
-    )
+    val sharedIsImage = initialSharedText.startsWith("content://") ||
+            initialSharedText.startsWith("file://")
+
+    val sharedIsUrl =
+        initialSharedText.startsWith("https://", ignoreCase = true) ||
+                initialSharedText.startsWith("http://", ignoreCase = true)
 
     var title by remember(item, sharedText) {
         mutableStateOf(
-            item?.title ?: ""
+            item?.title ?: when {
+                sharedIsImage -> "Shared image"
+                sharedIsUrl -> initialSharedText
+                    .substringAfter("://")
+                    .substringBefore("/")
+                    .ifBlank { "Saved link" }
+                initialSharedText.isNotBlank() -> initialSharedText
+                    .lineSequence()
+                    .first()
+                    .take(50)
+                else -> ""
+            }
         )
     }
 
     var content by remember(item, sharedText) {
-        mutableStateOf(
-            item?.content ?: initialSharedText
-        )
+        mutableStateOf(item?.content ?: initialSharedText)
     }
 
     var type by remember(item, sharedText) {
         mutableStateOf(
-            item?.type ?: if (initialSharedText.isBlank()) {
-                "NOTE"
-            } else if (sharedIsUrl) {
-                "LINK"
-            } else {
-                "SNIPPET"
+            item?.type ?: when {
+                sharedIsImage -> "IMAGE"
+                sharedIsUrl -> "LINK"
+                initialSharedText.isBlank() -> "NOTE"
+                else -> "SNIPPET"
             }
         )
     }
@@ -75,10 +82,17 @@ fun ItemEditorDialog(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: SecurityException) {
-                // Some document providers do not support persistent permission.
+                // Some document providers do not support persistent access.
+            } catch (_: IllegalArgumentException) {
+                // The provider may not support persistable URI permissions.
             }
 
             content = uri.toString()
+            type = "IMAGE"
+
+            if (title.isBlank()) {
+                title = "Saved image"
+            }
         }
     }
 
@@ -93,14 +107,10 @@ fun ItemEditorDialog(
                 .navigationBarsPadding()
         ) {
             Text(
-                text = if (item == null) {
-                    if (initialSharedText.isNotBlank()) {
-                        "Save shared item"
-                    } else {
-                        "Save something"
-                    }
-                } else {
-                    "Edit item"
+                text = when {
+                    item != null -> "Edit item"
+                    initialSharedText.isNotBlank() -> "Save shared item"
+                    else -> "Save something"
                 },
                 style = MaterialTheme.typography.headlineSmall
             )
@@ -118,7 +128,7 @@ fun ItemEditorDialog(
             Spacer(Modifier.height(12.dp))
 
             Text(
-                "Item type",
+                text = "Item type",
                 style = MaterialTheme.typography.titleSmall
             )
 
@@ -139,7 +149,15 @@ fun ItemEditorDialog(
 
             if (type == "IMAGE") {
                 Text(
-                    "Choose a picture from your device.",
+                    text = when {
+                        content.startsWith("content://") ||
+                                content.startsWith("file://") ->
+                            "An image URI is attached to this item."
+                        content.startsWith("https://", ignoreCase = true) ->
+                            "An image URL is attached to this item."
+                        else ->
+                            "Choose a picture from your device."
+                    },
                     style = MaterialTheme.typography.bodyMedium
                 )
 
@@ -154,7 +172,8 @@ fun ItemEditorDialog(
                     Text(
                         if (
                             content.startsWith("content://") ||
-                            content.startsWith("https://")
+                            content.startsWith("file://") ||
+                            content.startsWith("https://", ignoreCase = true)
                         ) {
                             "Choose another image"
                         } else {
@@ -163,13 +182,14 @@ fun ItemEditorDialog(
                     )
                 }
 
-                if (
-                    content.startsWith("content://") ||
-                    content.startsWith("https://")
-                ) {
-                    Text(
-                        "Image selected.",
-                        style = MaterialTheme.typography.bodySmall
+                if (content.isNotBlank()) {
+                    Spacer(Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = content,
+                        onValueChange = { content = it },
+                        label = { Text("Image URI or URL") },
+                        modifier = Modifier.fillMaxWidth(),
+                        minLines = 2
                     )
                 }
             } else {
@@ -211,8 +231,7 @@ fun ItemEditorDialog(
                         tags.trim()
                     )
                 },
-                enabled = title.isNotBlank() &&
-                        content.isNotBlank(),
+                enabled = title.isNotBlank() && content.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Save item")

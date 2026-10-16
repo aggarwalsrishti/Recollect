@@ -1,7 +1,7 @@
-
 package com.example.recollect
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -13,6 +13,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.example.recollect.ui.screens.AuthScreen
 import com.example.recollect.ui.screens.SaveScreen
@@ -25,21 +26,26 @@ class MainActivity : ComponentActivity() {
     private val saveViewModel: SaveViewModel by viewModels()
     private val authViewModel: AuthViewModel by viewModels()
 
-    // Holds text received from Android's Share menu.
     private var sharedText by mutableStateOf<String?>(null)
+    private var sharedImageUri by mutableStateOf<Uri?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        sharedText = getSharedText(intent)
+        handleSharedContent(intent)
 
         setContent {
             MaterialTheme {
                 Surface {
-                    var signedIn by mutableStateOf(
-                        FirebaseAuth.getInstance().currentUser != null
-                    )
-                    var authMessage by mutableStateOf("")
+                    var signedIn by remember {
+                        mutableStateOf(
+                            FirebaseAuth.getInstance().currentUser != null
+                        )
+                    }
+
+                    var authMessage by remember {
+                        mutableStateOf("")
+                    }
 
                     if (signedIn) {
                         SaveScreen(
@@ -51,12 +57,19 @@ class MainActivity : ComponentActivity() {
                             sharedText = sharedText,
                             onSharedTextHandled = {
                                 sharedText = null
+                            },
+                            sharedImageUri = sharedImageUri,
+                            onSharedImageHandled = {
+                                sharedImageUri = null
                             }
                         )
                     } else {
                         AuthScreen(
                             onSignIn = { email, password ->
-                                authViewModel.signIn(email, password) { error ->
+                                authViewModel.signIn(
+                                    email,
+                                    password
+                                ) { error ->
                                     if (error == null) {
                                         signedIn = true
                                         authMessage = ""
@@ -66,7 +79,10 @@ class MainActivity : ComponentActivity() {
                                 }
                             },
                             onSignUp = { email, password ->
-                                authViewModel.signUp(email, password) { error ->
+                                authViewModel.signUp(
+                                    email,
+                                    password
+                                ) { error ->
                                     if (error == null) {
                                         signedIn = true
                                         authMessage = ""
@@ -108,21 +124,38 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        sharedText = getSharedText(intent)
+        handleSharedContent(intent)
     }
 
-    private fun getSharedText(intent: Intent?): String? {
+    private fun handleSharedContent(intent: Intent?) {
+        // Clear previous shared data before handling a new share.
+        sharedText = null
+        sharedImageUri = null
+
         if (intent?.action != Intent.ACTION_SEND) {
-            return null
+            return
         }
 
-        if (intent.type != "text/plain") {
-            return null
-        }
+        val mimeType = intent.type ?: return
 
-        return intent
-            .getStringExtra(Intent.EXTRA_TEXT)
-            ?.trim()
-            ?.takeIf { it.isNotEmpty() }
+        when {
+            mimeType == "text/plain" -> {
+                sharedText = intent
+                    .getStringExtra(Intent.EXTRA_TEXT)
+                    ?.trim()
+                    ?.takeIf { it.isNotEmpty() }
+            }
+
+            mimeType.startsWith("image/") -> {
+                sharedImageUri = try {
+                    intent.getParcelableExtra(
+                        Intent.EXTRA_STREAM,
+                        Uri::class.java
+                    )
+                } catch (e: Exception) {
+                    null
+                }
+            }
+        }
     }
 }

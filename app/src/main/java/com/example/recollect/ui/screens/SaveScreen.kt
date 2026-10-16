@@ -1,6 +1,6 @@
-
 package com.example.recollect.ui.screens
 
+import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -20,13 +20,19 @@ fun SaveScreen(
     viewModel: SaveViewModel,
     onSignOut: () -> Unit,
     sharedText: String? = null,
-    onSharedTextHandled: () -> Unit = {}
+    onSharedTextHandled: () -> Unit = {},
+    sharedImageUri: Uri? = null,
+    onSharedImageHandled: () -> Unit = {}
 ) {
     val items by viewModel.allItems.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
 
-    var selectedItem by remember { mutableStateOf<SaveItem?>(null) }
-    var showEditor by remember { mutableStateOf(false) }
+    var selectedItem by remember {
+        mutableStateOf<SaveItem?>(null)
+    }
+    var showEditor by remember {
+        mutableStateOf(false)
+    }
 
     var selectedLocation by remember { mutableStateOf("INBOX") }
     var selectedType by remember { mutableStateOf("ALL") }
@@ -39,9 +45,9 @@ fun SaveScreen(
     val scope = rememberCoroutineScope()
     val user = FirebaseAuth.getInstance().currentUser
 
-    // Open the editor when another app shares text with Recollect.
-    LaunchedEffect(sharedText) {
-        if (!sharedText.isNullOrBlank()) {
+    // Open the editor when another app shares content with Recollect.
+    LaunchedEffect(sharedText, sharedImageUri) {
+        if (!sharedText.isNullOrBlank() || sharedImageUri != null) {
             selectedItem = null
             showEditor = true
         }
@@ -50,9 +56,7 @@ fun SaveScreen(
     val locations = listOf("ALL", "INBOX", "ARCHIVED")
     val types = listOf("ALL", "NOTE", "LINK", "SNIPPET", "IMAGE")
 
-    // Filter saved items by location, type, and search text.
     val visibleItems = items.filter { item ->
-
         val locationMatches = when (selectedLocation) {
             "ALL" -> true
             "INBOX" -> !item.isArchived
@@ -83,15 +87,12 @@ fun SaveScreen(
             }
         }
     ) { padding ->
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
                 .padding(18.dp)
         ) {
-
-            // App heading and sign-out button.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -101,7 +102,6 @@ fun SaveScreen(
                         text = "Recollect",
                         style = MaterialTheme.typography.headlineLarge
                     )
-
                     Text(user?.email ?: "Local inbox")
                 }
 
@@ -112,24 +112,17 @@ fun SaveScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Search field.
             OutlinedTextField(
                 value = searchText,
                 onValueChange = { searchText = it },
                 modifier = Modifier.fillMaxWidth(),
-                label = {
-                    Text("Search title, content or tags")
-                },
+                label = { Text("Search title, content or tags") },
                 singleLine = true
             )
 
             Spacer(Modifier.height(12.dp))
 
-            // Location filters.
-            Text(
-                text = "Location",
-                style = MaterialTheme.typography.titleSmall
-            )
+            Text("Location", style = MaterialTheme.typography.titleSmall)
 
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -138,9 +131,7 @@ fun SaveScreen(
                 items(locations) { location ->
                     FilterChip(
                         selected = selectedLocation == location,
-                        onClick = {
-                            selectedLocation = location
-                        },
+                        onClick = { selectedLocation = location },
                         label = {
                             Text(
                                 when (location) {
@@ -154,11 +145,7 @@ fun SaveScreen(
                 }
             }
 
-            // Item type filters.
-            Text(
-                text = "Item type",
-                style = MaterialTheme.typography.titleSmall
-            )
+            Text("Item type", style = MaterialTheme.typography.titleSmall)
 
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -167,9 +154,7 @@ fun SaveScreen(
                 items(types) { type ->
                     FilterChip(
                         selected = selectedType == type,
-                        onClick = {
-                            selectedType = type
-                        },
+                        onClick = { selectedType = type },
                         label = {
                             Text(
                                 when (type) {
@@ -183,14 +168,11 @@ fun SaveScreen(
                 }
             }
 
-            // Cloud saving setting for new items.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column(
-                    modifier = Modifier.weight(1f)
-                ) {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = if (cloudEnabled) {
                             "Cloud saving enabled"
@@ -199,70 +181,56 @@ fun SaveScreen(
                         },
                         style = MaterialTheme.typography.bodyMedium
                     )
-
                     Text(
-                        text = "This setting affects new items.",
+                        "This setting affects new items.",
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
 
                 Switch(
                     checked = cloudEnabled,
-                    onCheckedChange = {
-                        cloudEnabled = it
-                    }
+                    onCheckedChange = { cloudEnabled = it }
                 )
             }
 
             Spacer(Modifier.height(8.dp))
 
-            // Retry pending or failed cloud synchronization.
             if (user != null) {
                 OutlinedButton(
-                    onClick = {
-                        viewModel.retryPendingSync()
-                    },
+                    onClick = { viewModel.retryPendingSync() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Retry Sync")
                 }
-
                 Spacer(Modifier.height(8.dp))
             }
 
-            // Status message from the ViewModel.
             if (statusMessage.isNotBlank()) {
                 Text(
-                    text = statusMessage,
+                    statusMessage,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
 
-            // Message for individual cloud saves.
             if (message.isNotBlank() && message != statusMessage) {
                 Spacer(Modifier.height(4.dp))
-
                 Text(
-                    text = message,
+                    message,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
 
             Spacer(Modifier.height(8.dp))
 
-            // Empty state or saved items list.
             if (visibleItems.isEmpty()) {
                 Text(
                     text = when {
                         searchText.isNotBlank() ->
                             "No items match your search and filters."
-
                         selectedLocation == "ARCHIVED" ->
                             "Nothing archived in this category yet."
-
                         selectedLocation == "ALL" ->
                             "No items found."
-
                         else ->
                             "Your inbox is empty. Save your first useful thing."
                     }
@@ -274,40 +242,29 @@ fun SaveScreen(
                 ) {
                     items(
                         items = visibleItems,
-                        key = {
-                            "${it.ownerUid}-${it.id}-${it.title}"
-                        }
+                        key = { "${it.ownerUid}-${it.id}-${it.title}" }
                     ) { item ->
-
                         SaveItemCard(
                             item = item,
-
                             onEdit = {
                                 selectedItem = item
                                 showEditor = true
                             },
-
                             onDelete = {
                                 viewModel.deleteItem(item)
                             },
-
                             onArchive = {
                                 viewModel.toggleArchive(item)
                             },
-
                             isSignedIn = user != null,
-
-                            isSavingToCloud =
-                                uploadingItemId == item.id,
-
+                            isSavingToCloud = uploadingItemId == item.id,
                             onSaveToCloud = {
                                 scope.launch {
                                     uploadingItemId = item.id
                                     message = ""
 
                                     try {
-                                        message =
-                                            viewModel.saveItemToCloud(item)
+                                        message = viewModel.saveItemToCloud(item)
                                     } catch (e: Exception) {
                                         message = e.message
                                             ?: "Could not save item to cloud."
@@ -323,23 +280,31 @@ fun SaveScreen(
         }
     }
 
-    // Create or edit an item.
     if (showEditor) {
+        val incomingImage = sharedImageUri
+        val incomingText = sharedText
+
         ItemEditorDialog(
             item = selectedItem,
             sharedText = if (selectedItem == null) {
-                sharedText
+                incomingImage?.toString() ?: incomingText
             } else {
                 null
             },
-
             onSave = { title, content, type, tags ->
-
                 if (selectedItem == null) {
+                    val finalType = if (incomingImage != null) {
+                        "IMAGE"
+                    } else {
+                        type
+                    }
+
+                    val finalContent = incomingImage?.toString() ?: content
+
                     viewModel.addItem(
                         title = title,
-                        content = content,
-                        type = type,
+                        content = finalContent,
+                        type = finalType,
                         tags = tags,
                         cloud = cloudEnabled
                     )
@@ -356,17 +321,22 @@ fun SaveScreen(
                 showEditor = false
                 selectedItem = null
 
-                if (!sharedText.isNullOrBlank()) {
+                if (!incomingText.isNullOrBlank()) {
                     onSharedTextHandled()
                 }
+                if (incomingImage != null) {
+                    onSharedImageHandled()
+                }
             },
-
             onCancel = {
                 showEditor = false
                 selectedItem = null
 
-                if (!sharedText.isNullOrBlank()) {
+                if (!incomingText.isNullOrBlank()) {
                     onSharedTextHandled()
+                }
+                if (incomingImage != null) {
+                    onSharedImageHandled()
                 }
             }
         )
