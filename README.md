@@ -136,7 +136,7 @@ com.example.recollect/
 
 Download and install the Recollect Android application using the link below.
 
-**[Download Recollect APK](https://drive.google.com/file/d/1YLfM0QMJz5TVAbKGbEyObD55wizafQki/view?usp=drive_link)**
+**[Download Recollect APK](https://drive.google.com/file/d/1YLfM0QMJz5TVAbKGbEyObD55wizafQki/view?usp=drive_link](https://drive.google.com/file/d/1gMCRxCa5vRxGxF2Vg2pETGMO1XRlCRtg/view?usp=sharing)**
 
 
 
