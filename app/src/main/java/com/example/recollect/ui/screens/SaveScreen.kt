@@ -18,7 +18,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun SaveScreen(
     viewModel: SaveViewModel,
-    onSignOut: () -> Unit
+    onSignOut: () -> Unit,
+    sharedText: String? = null,
+    onSharedTextHandled: () -> Unit = {}
 ) {
     val items by viewModel.allItems.collectAsState()
     val statusMessage by viewModel.statusMessage.collectAsState()
@@ -37,10 +39,18 @@ fun SaveScreen(
     val scope = rememberCoroutineScope()
     val user = FirebaseAuth.getInstance().currentUser
 
+    // Open the editor when another app shares text with Recollect.
+    LaunchedEffect(sharedText) {
+        if (!sharedText.isNullOrBlank()) {
+            selectedItem = null
+            showEditor = true
+        }
+    }
+
     val locations = listOf("ALL", "INBOX", "ARCHIVED")
     val types = listOf("ALL", "NOTE", "LINK", "SNIPPET", "IMAGE")
 
-    // Filter items by location, type, and search text
+    // Filter saved items by location, type, and search text.
     val visibleItems = items.filter { item ->
 
         val locationMatches = when (selectedLocation) {
@@ -81,7 +91,7 @@ fun SaveScreen(
                 .padding(18.dp)
         ) {
 
-            // App heading and sign-out button
+            // App heading and sign-out button.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -95,16 +105,14 @@ fun SaveScreen(
                     Text(user?.email ?: "Local inbox")
                 }
 
-                TextButton(
-                    onClick = onSignOut
-                ) {
+                TextButton(onClick = onSignOut) {
                     Text("Sign out")
                 }
             }
 
             Spacer(Modifier.height(12.dp))
 
-            // Search field
+            // Search field.
             OutlinedTextField(
                 value = searchText,
                 onValueChange = { searchText = it },
@@ -117,7 +125,7 @@ fun SaveScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            // Location filters
+            // Location filters.
             Text(
                 text = "Location",
                 style = MaterialTheme.typography.titleSmall
@@ -128,7 +136,6 @@ fun SaveScreen(
                 contentPadding = PaddingValues(vertical = 6.dp)
             ) {
                 items(locations) { location ->
-
                     FilterChip(
                         selected = selectedLocation == location,
                         onClick = {
@@ -147,7 +154,7 @@ fun SaveScreen(
                 }
             }
 
-            // Item type filters
+            // Item type filters.
             Text(
                 text = "Item type",
                 style = MaterialTheme.typography.titleSmall
@@ -158,7 +165,6 @@ fun SaveScreen(
                 contentPadding = PaddingValues(vertical = 6.dp)
             ) {
                 items(types) { type ->
-
                     FilterChip(
                         selected = selectedType == type,
                         onClick = {
@@ -169,9 +175,7 @@ fun SaveScreen(
                                 when (type) {
                                     "ALL" -> "All types"
                                     else -> type.lowercase()
-                                        .replaceFirstChar {
-                                            it.uppercase()
-                                        }
+                                        .replaceFirstChar { it.uppercase() }
                                 }
                             )
                         }
@@ -179,7 +183,7 @@ fun SaveScreen(
                 }
             }
 
-            // Cloud saving setting for new items
+            // Cloud saving setting for new items.
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
@@ -210,7 +214,7 @@ fun SaveScreen(
                 )
             }
 
-            // Status message from ViewModel
+            // Status message from the ViewModel.
             if (statusMessage.isNotBlank()) {
                 Text(
                     text = statusMessage,
@@ -218,7 +222,7 @@ fun SaveScreen(
                 )
             }
 
-            // Message for individual cloud saves
+            // Message for individual cloud saves.
             if (message.isNotBlank() && message != statusMessage) {
                 Spacer(Modifier.height(4.dp))
 
@@ -230,9 +234,8 @@ fun SaveScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Empty state or saved items list
+            // Empty state or saved items list.
             if (visibleItems.isEmpty()) {
-
                 Text(
                     text = when {
                         searchText.isNotBlank() ->
@@ -248,9 +251,7 @@ fun SaveScreen(
                             "Your inbox is empty. Save your first useful thing."
                     }
                 )
-
             } else {
-
                 LazyColumn(
                     verticalArrangement = Arrangement.spacedBy(10.dp),
                     contentPadding = PaddingValues(bottom = 90.dp)
@@ -306,16 +307,19 @@ fun SaveScreen(
         }
     }
 
-    // Add or edit item dialog
+    // Create or edit an item.
     if (showEditor) {
-
         ItemEditorDialog(
             item = selectedItem,
+            sharedText = if (selectedItem == null) {
+                sharedText
+            } else {
+                null
+            },
 
             onSave = { title, content, type, tags ->
 
                 if (selectedItem == null) {
-
                     viewModel.addItem(
                         title = title,
                         content = content,
@@ -323,9 +327,7 @@ fun SaveScreen(
                         tags = tags,
                         cloud = cloudEnabled
                     )
-
                 } else {
-
                     viewModel.updateItem(
                         selectedItem!!,
                         title,
@@ -337,11 +339,19 @@ fun SaveScreen(
 
                 showEditor = false
                 selectedItem = null
+
+                if (!sharedText.isNullOrBlank()) {
+                    onSharedTextHandled()
+                }
             },
 
             onCancel = {
                 showEditor = false
                 selectedItem = null
+
+                if (!sharedText.isNullOrBlank()) {
+                    onSharedTextHandled()
+                }
             }
         )
     }

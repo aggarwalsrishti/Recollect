@@ -1,3 +1,4 @@
+
 package com.example.recollect.ui.screens
 
 import android.content.Intent
@@ -20,18 +21,44 @@ import com.example.recollect.data.room_database.SaveItem
 fun ItemEditorDialog(
     item: SaveItem?,
     onSave: (String, String, String, String) -> Unit,
-    onCancel: () -> Unit
+    onCancel: () -> Unit,
+    sharedText: String? = null
 ) {
-    var title by remember(item) {
-        mutableStateOf(item?.title ?: "")
+    val initialSharedText = sharedText?.trim().orEmpty()
+
+    val sharedIsUrl = initialSharedText.startsWith(
+        "https://",
+        ignoreCase = true
+    ) || initialSharedText.startsWith(
+        "http://",
+        ignoreCase = true
+    )
+
+    var title by remember(item, sharedText) {
+        mutableStateOf(
+            item?.title ?: ""
+        )
     }
-    var content by remember(item) {
-        mutableStateOf(item?.content ?: "")
+
+    var content by remember(item, sharedText) {
+        mutableStateOf(
+            item?.content ?: initialSharedText
+        )
     }
-    var type by remember(item) {
-        mutableStateOf(item?.type ?: "NOTE")
+
+    var type by remember(item, sharedText) {
+        mutableStateOf(
+            item?.type ?: if (initialSharedText.isBlank()) {
+                "NOTE"
+            } else if (sharedIsUrl) {
+                "LINK"
+            } else {
+                "SNIPPET"
+            }
+        )
     }
-    var tags by remember(item) {
+
+    var tags by remember(item, sharedText) {
         mutableStateOf(item?.tags ?: "")
     }
 
@@ -55,7 +82,9 @@ fun ItemEditorDialog(
         }
     }
 
-    ModalBottomSheet(onDismissRequest = onCancel) {
+    ModalBottomSheet(
+        onDismissRequest = onCancel
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -64,7 +93,15 @@ fun ItemEditorDialog(
                 .navigationBarsPadding()
         ) {
             Text(
-                text = if (item == null) "Save something" else "Edit item",
+                text = if (item == null) {
+                    if (initialSharedText.isNotBlank()) {
+                        "Save shared item"
+                    } else {
+                        "Save something"
+                    }
+                } else {
+                    "Edit item"
+                },
                 style = MaterialTheme.typography.headlineSmall
             )
 
@@ -92,9 +129,7 @@ fun ItemEditorDialog(
                 items(types) { option ->
                     FilterChip(
                         selected = type == option,
-                        onClick = {
-                            type = option
-                        },
+                        onClick = { type = option },
                         label = { Text(option) }
                     )
                 }
@@ -176,7 +211,8 @@ fun ItemEditorDialog(
                         tags.trim()
                     )
                 },
-                enabled = title.isNotBlank() && content.isNotBlank(),
+                enabled = title.isNotBlank() &&
+                        content.isNotBlank(),
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text("Save item")
