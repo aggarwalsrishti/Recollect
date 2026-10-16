@@ -25,12 +25,27 @@ Recollect is an Android application that helps users save notes, links, and imag
 - Handle cloud synchronization and retry pending sync operations.
 - Keep local data available when cloud synchronization is temporarily unavailable.
 
-### Additional Feature — Android Share Integration
+## Stage 3 — Android Share Integration
 
-- Share text and links from other apps into Recollect.
-- Receive shared content through Android's Share menu.
-- Open the item editor with the shared content prefilled.
-- Share images into Recollect for saving.
+Recollect supports receiving shared content from other Android applications through Android's Share menu.
+
+- Receive shared text and links from supported apps.
+- Receive shared images.
+- Open the item editor with shared content prefilled, making it easier to save content without entering it manually.
+- Handle supported content through Android share intents.
+
+## Advanced Mission — Better Sync Behaviours (Mission A)
+
+Recollect includes improvements to cloud synchronization to make saving items more resilient when network connectivity or cloud operations fail.
+
+- **Local-first saving:** Save items locally so that temporary cloud failures do not prevent local persistence.
+- **Pending sync retry:** Retry pending cloud synchronization operations.
+- **Offline resilience:** Keep locally saved content available while cloud synchronization is unavailable.
+- **Deletion handling:** Track deletions so that deleted items can be handled during synchronization instead of unintentionally reappearing.
+- **Conflict handling:** Use timestamps to help resolve differences between local and cloud versions of an item.
+
+These improvements aim to make synchronization more reliable while keeping the app's local data accessible.
+
 
 ## Tech Stack
 
