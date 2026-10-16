@@ -1,108 +1,128 @@
-# Recollect 📝
+# Recollect — Personal Save-for-Later App
 
-**Save it now. Recollect it anytime.**
+**BYTE MAIT App Development Recruitment Task**
 
-Recollect is an Android application designed to help users save and organize useful information in one place. Whether it's a note, a link, a code snippet, or an image, Recollect helps you keep important things handy so you can find them later.
+Recollect is an Android application that helps users save notes, links, and images for later reference. It supports local storage using Room and cloud storage using Firebase, allowing users to access their saved items across devices after signing in.
 
-## ✨ Features
+## Features
 
-- **Save Notes:** Store important thoughts, reminders, and information.
-- **Save Links:** Keep useful URLs for quick access later.
-- **Save Snippets:** Store text snippets or small pieces of code.
-- **Save Images:** Save images for future reference.
-- **Search:** Find saved items using their title, content, or tags.
-- **Organize Items:** Filter items by type and view your inbox or archived items.
-- **Archive and Restore:** Keep your inbox organized without permanently deleting items.
-- **Edit and Delete:** Update saved information or remove items you no longer need.
-- **Local Storage:** Keep saved items on your device using Room.
-- **Firebase Authentication:** Sign in or create an account using Firebase Authentication.
-- **Cloud Storage:** Save supported items to the cloud using Firebase and access cloud-backed data.
-- **Simple Interface:** Manage your saved information through a clean Jetpack Compose interface.
+### Stage 1 — Local Save-for-Later
 
-## 🛠️ Tech Stack
+- Create, view, edit, and delete saved items.
+- Save notes, links, and images.
+- Add tags to organize saved content.
+- Search and filter saved items.
+- Archive items and restore them when needed.
+- Store items locally using Room Database so they persist across app restarts.
 
-| Technology | Purpose |
-|---|---|
-| Kotlin | Main programming language |
-| Android Studio | Development environment |
-| Jetpack Compose | UI development |
-| Material 3 | UI components and styling |
-| Room Database | Local data persistence |
-| Firebase Authentication | User sign-in and registration |
-| Cloud Firestore | Cloud data storage |
-| Kotlin Coroutines | Asynchronous operations |
+### Stage 2 — Authentication and Cloud Storage
 
-## 📱 App Structure
+- Sign up and sign in using email and password.
+- Authenticate users using Firebase Authentication.
+- Store user-specific items in Cloud Firestore.
+- Associate saved items with their respective owners.
+- Access saved items after signing in on another device.
+- Handle cloud synchronization and retry pending sync operations.
+- Keep local data available when cloud synchronization is temporarily unavailable.
 
-The project is organized into several parts:
+### Additional Feature — Android Share Integration
 
-- `data/` — Local data models and database-related code.
-- `repository/` — Data access and repository logic.
-- `ui/screens/` — Authentication, item editor, saved-item card, and main save screen.
-- `viewmodel/` — UI state and application logic.
-- `MainActivity.kt` — Application entry point and authentication-based navigation.
+- Share text and links from other apps into Recollect.
+- Receive shared content through Android's Share menu.
+- Open the item editor with the shared content prefilled.
+- Share images into Recollect for saving.
 
-*Note: Folder names may vary slightly depending on the final project structure.*
+## Tech Stack
 
-## 🚀 Getting Started
+- **Language:** Kotlin
+- **UI:** Jetpack Compose
+- **UI Components:** Material 3
+- **Local Database:** Room
+- **Authentication:** Firebase Authentication
+- **Cloud Database:** Cloud Firestore
+- **Architecture Components:** ViewModel, Kotlin Coroutines and Flow
+- **Android Integration:** Intents and Activity Result APIs
+
+## Architecture Diagram
+
+The following diagram illustrates the main components of Recollect and how the UI, application logic, local database, and Firebase services interact.
+
+![Recollect Architecture Diagram](docs/architecture.png)
+
+## Project Structure
+
+The project follows a package-based structure to separate the UI, application logic, data access, and cloud functionality.
+
+```text
+com.example.recollect/
+├── data/
+│   ├── cloud/
+│   │   └── CloudRepository.kt
+│   └── room_database/
+│       ├── SaveDatabase.kt
+│       ├── SaveItem.kt
+│       └── SaveItemDao.kt
+├── repository/
+│   └── SaveRepository.kt
+├── ui/
+│   └── screens/
+│       ├── AuthScreen.kt
+│       ├── ItemEditorDialog.kt
+│       ├── SaveItemCard.kt
+│       └── SaveScreen.kt
+├── viewmodel/
+│   └── AuthViewModel.kt
+│   └── SaveViewModel.kt
+└── MainActivity.kt
+```
+
+## Getting Started
 
 ### Prerequisites
 
-Before running Recollect, make sure you have:
+- Android Studio
+- Android SDK compatible with the project's Gradle configuration
+- A Firebase project
+- An Android emulator or physical Android device
 
-- Android Studio installed.
-- A compatible Android SDK.
-- A physical Android device or Android emulator.
-- A Firebase project configured for the application.
+### Setup
 
-### Installation
-
-1. Clone this repository:
+1. Clone the repository:
 
    ```bash
-   git clone https://github.com/YOUR-USERNAME/Recollect.git
+   git clone <YOUR_GITHUB_REPOSITORY_URL>
    ```
 
-2. Open Android Studio.
-3. Select **Open** and choose the cloned project folder.
-4. Configure Firebase for the project and add your own `google-services.json` file to the app module.
-5. Sync the project with Gradle.
-6. Run the app on an emulator or connected Android device.
+2. Open the project in Android Studio.
 
-Replace `YOUR-USERNAME` with your GitHub username.
+3. Configure Firebase for the Android application and place the `google-services.json` file in the app module directory, as required by the Firebase setup.
 
-## 🔥 Firebase Setup
+4. In the Firebase Console, enable **Email/Password** under Authentication sign-in providers.
 
-Recollect uses Firebase Authentication and Cloud Firestore for cloud-related functionality.
+5. Set up Cloud Firestore and configure its security rules to ensure users can access only their own saved items.
 
-1. Create a project in the [Firebase Console](https://console.firebase.google.com/).
-2. Register an Android app using the package name `com.example.recollect`, if that is still the package name in your project.
-3. Enable **Email/Password** sign-in under Firebase Authentication.
-4. Create a Cloud Firestore database.
-5. Add your Firebase configuration file to the app module.
-6. Configure Firestore security rules so each authenticated user can access only their own data.
+6. Allow Android Studio to sync the Gradle project.
 
-**Security note:** Never commit Firebase service-account keys, private credentials, or other secrets to a public repository. Keep `google-services.json` out of Git if you intend to exclude it using `.gitignore`.
+7. Build and run the app on an emulator or connected Android device.
 
-## 🔐 Privacy and Data
+## Technical Decisions
 
-- Items can be stored locally using Room.
-- Cloud functionality depends on Firebase configuration and authentication.
-- Firestore security rules should restrict access to each user's own records.
-- Review your Firebase security rules before publishing the application.
+- **Room for local persistence:** Room provides structured local storage and allows saved items to remain available after the application is closed or restarted.
+- **Jetpack Compose for the UI:** Compose is used to build the app screens and interactive components using Kotlin.
+- **ViewModel and repository separation:** ViewModels manage screen-related state and application actions, while repositories handle data access.
+- **Firebase Authentication:** Email/password authentication provides account-based access without requiring a custom authentication backend.
+- **Cloud Firestore:** Firestore stores user-specific saved items and supports accessing cloud data from multiple devices.
+- **Local-first data handling:** Local persistence allows users to retain access to saved content even when cloud synchronization is unavailable. Pending cloud operations can be retried.
+- **Android share intents:** Share intents allow supported content from other apps to be passed into Recollect and prefilled in the item editor.
 
-## 🗺️ Future Improvements
+## Known Limitations
 
-Potential improvements include:
+- Image sharing and image saving rely on URI access provided by Android. Access to an image may depend on whether the URI permission remains valid.
+- Cloud functionality requires a correctly configured Firebase project and appropriate Firestore security rules.
+- Conflict resolution during simultaneous edits across devices is limited and may not cover every possible synchronization scenario.
 
-- Automatic synchronization between local and cloud data.
-- Improved offline synchronization and conflict handling.
-- Better tag management and filtering.
-- Image upload and cloud image storage.
-- Export and backup options.
-- UI and accessibility improvements.
+## Submission
 
-
----
-
-**Built with Kotlin, Jetpack Compose, Room, and Firebase.**
+- **Project:** Recollect
+- **Repository:** <YOUR_GITHUB_REPOSITORY_URL>
+- **Task:** BYTE MAIT App Development Recruitment Task
