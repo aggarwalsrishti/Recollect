@@ -1,8 +1,13 @@
 # Recollect — Personal Save-for-Later App
 
-**BYTE MAIT App Development Recruitment Task**
+Recollect is an Android save-for-later application built using Kotlin and Jetpack Compose. It allows users to save notes, links, and images, organize their saved content, and access their items through local storage and Firebase-backed cloud storage.
 
-Recollect is an Android application that helps users save notes, links, and images for later reference. It supports local storage using Room and cloud storage using Firebase, allowing users to access their saved items across devices after signing in.
+## Project Status
+
+- **Stage 1 — Local Save-for-Later:** Implemented
+- **Stage 2 — Authentication and Cloud Storage:** Implemented
+- **Stage 3 — Share into App:** Implemented
+- **Advanced Mission — Better Sync Behaviours:** Completed
 
 ## Features
 
@@ -10,42 +15,56 @@ Recollect is an Android application that helps users save notes, links, and imag
 
 - Create, view, edit, and delete saved items.
 - Save notes, links, and images.
-- Add tags to organize saved content.
+- Organize content using tags.
 - Search and filter saved items.
-- Archive items and restore them when needed.
-- Store items locally using Room Database so they persist across app restarts.
+- Archive and restore items.
+- Persist saved content locally using Room Database.
 
 ### Stage 2 — Authentication and Cloud Storage
 
-- Sign up and sign in using email and password.
-- Authenticate users using Firebase Authentication.
-- Store user-specific items in Cloud Firestore.
-- Associate saved items with their respective owners.
-- Access saved items after signing in on another device.
-- Handle cloud synchronization and retry pending sync operations.
-- Keep local data available when cloud synchronization is temporarily unavailable.
+- Register and sign in using email and password.
+- Authenticate users through Firebase Authentication.
+- Store saved items in Cloud Firestore.
+- Associate items with their respective user accounts.
+- Access cloud-saved items after signing in on another device.
+- Handle cloud synchronization failures and retry pending operations.
 
-## Stage 3 — Android Share Integration
+### Stage 3 — Share into App
 
-Recollect supports receiving shared content from other Android applications through Android's Share menu.
-
-- Receive shared text and links from supported apps.
+- Receive shared text and URLs from other Android applications through the Share menu.
 - Receive shared images.
-- Open the item editor with shared content prefilled, making it easier to save content without entering it manually.
-- Handle supported content through Android share intents.
+- Open the item editor with shared content prefilled.
+- Handle unsupported or malformed shared content without crashing the application.
 
-## Advanced Mission — Better Sync Behaviours (Mission A)
+### Advanced Mission — Better Sync Behaviours
 
-Recollect includes improvements to cloud synchronization to make saving items more resilient when network connectivity or cloud operations fail.
+Recollect includes improvements that make synchronization more resilient when network connectivity or cloud operations fail.
 
-- **Local-first saving:** Save items locally so that temporary cloud failures do not prevent local persistence.
-- **Pending sync retry:** Retry pending cloud synchronization operations.
-- **Offline resilience:** Keep locally saved content available while cloud synchronization is unavailable.
-- **Deletion handling:** Track deletions so that deleted items can be handled during synchronization instead of unintentionally reappearing.
-- **Conflict handling:** Use timestamps to help resolve differences between local and cloud versions of an item.
+- **Local-first persistence:** Save items locally so temporary cloud failures do not prevent local data from being stored.
+- **Retry pending synchronization:** Retry cloud operations that have not completed successfully.
+- **Offline resilience:** Keep locally stored content available when cloud synchronization is unavailable.
+- **Deletion synchronization:** Track deletions so removed items can be handled during synchronization.
+- **Conflict handling:** Use timestamps to help reconcile differences between local and cloud versions of an item.
 
-These improvements aim to make synchronization more reliable while keeping the app's local data accessible.
+## Authentication, Data Storage and Privacy
 
+### Authentication
+
+Recollect uses Firebase Authentication with email and password. Users must authenticate to access their account's cloud data.
+
+### Where Data Is Stored
+
+- **Local storage:** Room Database stores saved items on the device.
+- **Cloud storage:** Cloud Firestore stores user-specific saved items under the corresponding user's data path.
+- **Authentication data:** Firebase Authentication manages user sign-in and account identity.
+
+### How User Data Is Protected
+
+Cloud data access is protected by backend Firestore Security Rules rather than relying only on UI restrictions.
+
+The intended access model is that an authenticated user can access only their own saved items. Requests attempting to access another user's data must be rejected by Firestore Security Rules, even if the requester changes an item ID or constructs a different request.
+
+**Security configuration:** Ensure the deployed Firestore Security Rules enforce this ownership restriction and have been tested with separate user accounts before submission.
 
 ## Tech Stack
 
@@ -60,13 +79,11 @@ These improvements aim to make synchronization more reliable while keeping the a
 
 ## Architecture Diagram
 
-The following diagram illustrates the main components of Recollect and how the UI, application logic, local database, and Firebase services interact.
+The architecture diagram illustrates the interaction between the user interface, application logic, authentication, cloud services, and local persistence.
 
 ![Recollect Architecture Diagram](docs/architecture.png)
 
 ## Project Structure
-
-The project follows a package-based structure to separate the UI, application logic, data access, and cloud functionality.
 
 ```text
 com.example.recollect/
@@ -86,52 +103,58 @@ com.example.recollect/
 │       ├── SaveItemCard.kt
 │       └── SaveScreen.kt
 ├── viewmodel/
-│   └── AuthViewModel.kt
+│   ├── AuthViewModel.kt
 │   └── SaveViewModel.kt
 └── MainActivity.kt
 ```
 
-## Getting Started
+## How to Run
 
 ### Prerequisites
 
 - Android Studio
-- Android SDK compatible with the project's Gradle configuration
-- A Firebase project
+- A compatible Android SDK
 - An Android emulator or physical Android device
+- A Firebase project configured for the application
 
-### Setup
+### Setup Instructions
 
-1. Clone the repository:
+1. Clone this repository:
 
    ```bash
    git clone <YOUR_GITHUB_REPOSITORY_URL>
    ```
 
 2. Open the project in Android Studio.
+3. Configure Firebase and add the appropriate `google-services.json` file to the app module.
+4. Enable Email/Password authentication in the Firebase Console.
+5. Configure Cloud Firestore and deploy the required user-ownership security rules.
+6. Sync the project with Gradle.
+7. Build and run the application on an emulator or connected Android device.
 
-3. Configure Firebase for the Android application and place the `google-services.json` file in the app module directory, as required by the Firebase setup.
+## APK Download
 
-4. In the Firebase Console, enable **Email/Password** under Authentication sign-in providers.
+Download the Recollect APK using the Google Drive link below:
 
-5. Set up Cloud Firestore and configure its security rules to ensure users can access only their own saved items.
+**[Download Recollect APK]([(https://drive.google.com/file/d/1YLfM0QMJz5TVAbKGbEyObD55wizafQki/view?usp=drive_link))**
 
-6. Allow Android Studio to sync the Gradle project.
-
-7. Build and run the app on an emulator or connected Android device.
+Make sure the Drive file's sharing permissions allow the reviewers to access the APK.
 
 ## Technical Decisions
 
-- **Room for local persistence:** Room provides structured local storage and allows saved items to remain available after the application is closed or restarted.
-- **Jetpack Compose for the UI:** Compose is used to build the app screens and interactive components using Kotlin.
-- **ViewModel and repository separation:** ViewModels manage screen-related state and application actions, while repositories handle data access.
-- **Firebase Authentication:** Email/password authentication provides account-based access without requiring a custom authentication backend.
-- **Cloud Firestore:** Firestore stores user-specific saved items and supports accessing cloud data from multiple devices.
-- **Local-first data handling:** Local persistence allows users to retain access to saved content even when cloud synchronization is unavailable. Pending cloud operations can be retried.
-- **Android share intents:** Share intents allow supported content from other apps to be passed into Recollect and prefilled in the item editor.
+- **Room Database:** Provides structured local persistence and preserves saved items across application restarts.
+- **Jetpack Compose:** Provides a declarative approach to building the Android interface.
+- **ViewModel and repository separation:** Separates UI state and application actions from data-access responsibilities.
+- **Firebase Authentication:** Provides account-based authentication without requiring a custom authentication server.
+- **Cloud Firestore:** Supports remote storage of user-specific items across devices.
+- **Local-first data handling:** Keeps locally stored content available when remote synchronization fails.
+- **Synchronization retry and conflict handling:** Improves resilience when cloud operations fail or local and remote versions differ.
+- **Android share intents:** Allow supported content from other apps to be received and prefilled in the editor.
 
 ## Known Limitations
 
-- Image sharing and image saving rely on URI access provided by Android. Access to an image may depend on whether the URI permission remains valid.
-- Cloud functionality requires a correctly configured Firebase project and appropriate Firestore security rules.
-- Conflict resolution during simultaneous edits across devices is limited and may not cover every possible synchronization scenario.
+- Image access can depend on Android URI permissions and the continued availability of the referenced image.
+- Cloud functionality requires correct Firebase configuration and deployed Firestore security rules.
+- Conflict resolution may not cover every possible simultaneous-edit scenario.
+
+
