@@ -1,3 +1,4 @@
+
 package com.example.recollect.ui.screens
 
 import android.net.Uri
@@ -30,17 +31,34 @@ fun SaveScreen(
     var selectedItem by remember {
         mutableStateOf<SaveItem?>(null)
     }
+
     var showEditor by remember {
         mutableStateOf(false)
     }
 
-    var selectedLocation by remember { mutableStateOf("INBOX") }
-    var selectedType by remember { mutableStateOf("ALL") }
-    var searchText by remember { mutableStateOf("") }
+    var selectedLocation by remember {
+        mutableStateOf("INBOX")
+    }
 
-    var cloudEnabled by remember { mutableStateOf(true) }
-    var message by remember { mutableStateOf("") }
-    var uploadingItemId by remember { mutableStateOf<Int?>(null) }
+    var selectedType by remember {
+        mutableStateOf("ALL")
+    }
+
+    var searchText by remember {
+        mutableStateOf("")
+    }
+
+    var cloudEnabled by remember {
+        mutableStateOf(true)
+    }
+
+    var message by remember {
+        mutableStateOf("")
+    }
+
+    var uploadingItemId by remember {
+        mutableStateOf<Int?>(null)
+    }
 
     val scope = rememberCoroutineScope()
     val user = FirebaseAuth.getInstance().currentUser
@@ -122,7 +140,10 @@ fun SaveScreen(
 
             Spacer(Modifier.height(12.dp))
 
-            Text("Location", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Location",
+                style = MaterialTheme.typography.titleSmall
+            )
 
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -131,7 +152,9 @@ fun SaveScreen(
                 items(locations) { location ->
                     FilterChip(
                         selected = selectedLocation == location,
-                        onClick = { selectedLocation = location },
+                        onClick = {
+                            selectedLocation = location
+                        },
                         label = {
                             Text(
                                 when (location) {
@@ -145,7 +168,10 @@ fun SaveScreen(
                 }
             }
 
-            Text("Item type", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Item type",
+                style = MaterialTheme.typography.titleSmall
+            )
 
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -154,7 +180,9 @@ fun SaveScreen(
                 items(types) { type ->
                     FilterChip(
                         selected = selectedType == type,
-                        onClick = { selectedType = type },
+                        onClick = {
+                            selectedType = type
+                        },
                         label = {
                             Text(
                                 when (type) {
@@ -181,6 +209,7 @@ fun SaveScreen(
                         },
                         style = MaterialTheme.typography.bodyMedium
                     )
+
                     Text(
                         "This setting affects new items.",
                         style = MaterialTheme.typography.bodySmall
@@ -197,11 +226,14 @@ fun SaveScreen(
 
             if (user != null) {
                 OutlinedButton(
-                    onClick = { viewModel.retryPendingSync() },
+                    onClick = {
+                        viewModel.retryPendingSync()
+                    },
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text("Retry Sync")
                 }
+
                 Spacer(Modifier.height(8.dp))
             }
 
@@ -227,10 +259,13 @@ fun SaveScreen(
                     text = when {
                         searchText.isNotBlank() ->
                             "No items match your search and filters."
+
                         selectedLocation == "ARCHIVED" ->
                             "Nothing archived in this category yet."
+
                         selectedLocation == "ALL" ->
                             "No items found."
+
                         else ->
                             "Your inbox is empty. Save your first useful thing."
                     }
@@ -242,7 +277,9 @@ fun SaveScreen(
                 ) {
                     items(
                         items = visibleItems,
-                        key = { "${it.ownerUid}-${it.id}-${it.title}" }
+                        key = {
+                            "${it.ownerUid}-${it.id}-${it.title}"
+                        }
                     ) { item ->
                         SaveItemCard(
                             item = item,
@@ -293,17 +330,17 @@ fun SaveScreen(
             },
             onSave = { title, content, type, tags ->
                 if (selectedItem == null) {
+                    // Important: use content returned by the editor.
+                    // Do not replace it with incomingImage.toString().
                     val finalType = if (incomingImage != null) {
                         "IMAGE"
                     } else {
                         type
                     }
 
-                    val finalContent = incomingImage?.toString() ?: content
-
                     viewModel.addItem(
                         title = title,
-                        content = finalContent,
+                        content = content,
                         type = finalType,
                         tags = tags,
                         cloud = cloudEnabled
@@ -324,6 +361,7 @@ fun SaveScreen(
                 if (!incomingText.isNullOrBlank()) {
                     onSharedTextHandled()
                 }
+
                 if (incomingImage != null) {
                     onSharedImageHandled()
                 }
@@ -335,6 +373,7 @@ fun SaveScreen(
                 if (!incomingText.isNullOrBlank()) {
                     onSharedTextHandled()
                 }
+
                 if (incomingImage != null) {
                     onSharedImageHandled()
                 }

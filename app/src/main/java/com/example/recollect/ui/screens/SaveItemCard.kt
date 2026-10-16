@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -43,6 +42,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import coil.compose.AsyncImage
 import com.example.recollect.data.room_database.SaveItem
+import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -53,6 +53,21 @@ private fun formatDateTime(timestamp: Long): String {
         Locale.getDefault()
     )
     return formatter.format(Date(timestamp))
+}
+
+/*
+ * New items store an absolute path inside Recollect's files directory.
+ * This also supports older content:// and https:// image references.
+ */
+private fun imageModel(content: String): Any {
+    return when {
+        content.startsWith("content://") ||
+                content.startsWith("file://") ||
+                content.startsWith("http://") ||
+                content.startsWith("https://") -> Uri.parse(content)
+
+        else -> File(content)
+    }
 }
 
 @Composable
@@ -70,20 +85,27 @@ fun SaveItemCard(
     var showFullText by remember { mutableStateOf(false) }
     var showFullImage by remember { mutableStateOf(false) }
 
+    val isImage = item.type.equals("IMAGE", ignoreCase = true)
+    val imageExists = remember(item.content) {
+        when {
+            item.content.startsWith("content://") ||
+                    item.content.startsWith("file://") ||
+                    item.content.startsWith("http://") ||
+                    item.content.startsWith("https://") -> true
+
+            else -> File(item.content).exists()
+        }
+    }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
-        elevation = CardDefaults.cardElevation(
-            defaultElevation = 3.dp
-        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp),
         shape = RoundedCornerShape(16.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
+        Column(modifier = Modifier.padding(16.dp)) {
 
-            // Title and type
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -103,42 +125,37 @@ fun SaveItemCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
-            // Created time
             Text(
                 text = "Created: ${formatDateTime(item.createdAt)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(3.dp))
+            Spacer(Modifier.height(3.dp))
 
-            // Last updated time
             Text(
                 text = "Last updated: ${formatDateTime(item.updatedAt)}",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(Modifier.height(12.dp))
 
-            // Image preview
-            if (item.type.equals("IMAGE", ignoreCase = true)) {
-                if (item.content.isNotBlank()) {
+            if (isImage) {
+                if (item.content.isNotBlank() && imageExists) {
                     AsyncImage(
-                        model = item.content,
+                        model = imageModel(item.content),
                         contentDescription = item.title,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(180.dp)
-                            .clickable {
-                                showFullImage = true
-                            },
+                            .clickable { showFullImage = true },
                         contentScale = ContentScale.Crop
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(Modifier.height(4.dp))
 
                     Text(
                         text = "Tap image to view full screen",
@@ -147,14 +164,12 @@ fun SaveItemCard(
                     )
                 } else {
                     Text(
-                        text = "No image selected.",
-                        style = MaterialTheme.typography.bodyMedium
+                        text = "Image is unavailable. Edit this item to select the image again.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.error
                     )
                 }
-            }
-
-            // Link preview
-            else if (item.type.equals("LINK", ignoreCase = true)) {
+            } else if (item.type.equals("LINK", ignoreCase = true)) {
                 Text(
                     text = item.content,
                     color = MaterialTheme.colorScheme.primary,
@@ -170,29 +185,19 @@ fun SaveItemCard(
                                 "https://${item.content}"
                             }
 
-                            val intent = Intent(
-                                Intent.ACTION_VIEW,
-                                Uri.parse(url)
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(url))
                             )
-
-                            context.startActivity(intent)
-                        } catch (e: Exception) {
+                        } catch (_: Exception) {
                             // The link could not be opened.
                         }
                     }
                 )
-            }
-
-            // Notes and snippets
-            else {
+            } else {
                 Text(
                     text = item.content,
                     style = MaterialTheme.typography.bodyMedium,
-                    maxLines = if (showFullText) {
-                        Int.MAX_VALUE
-                    } else {
-                        4
-                    },
+                    maxLines = if (showFullText) Int.MAX_VALUE else 4,
                     overflow = if (showFullText) {
                         TextOverflow.Clip
                     } else {
@@ -202,25 +207,15 @@ fun SaveItemCard(
 
                 if (item.content.length > 150) {
                     TextButton(
-                        onClick = {
-                            showFullText = !showFullText
-                        }
+                        onClick = { showFullText = !showFullText }
                     ) {
-                        Text(
-                            text = if (showFullText) {
-                                "Show less"
-                            } else {
-                                "Read more"
-                            }
-                        )
+                        Text(if (showFullText) "Show less" else "Read more")
                     }
                 }
             }
 
-            // Tags
             if (item.tags.isNotBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-
+                Spacer(Modifier.height(12.dp))
                 Text(
                     text = "Tags: ${item.tags}",
                     style = MaterialTheme.typography.bodySmall,
@@ -228,9 +223,8 @@ fun SaveItemCard(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(Modifier.height(16.dp))
 
-            // Edit and delete buttons
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -250,25 +244,17 @@ fun SaveItemCard(
                 }
             }
 
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(Modifier.height(8.dp))
 
-            // Archive or restore button
             OutlinedButton(
                 onClick = onArchive,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = if (item.isArchived) {
-                        "Restore to Inbox"
-                    } else {
-                        "Archive"
-                    }
-                )
+                Text(if (item.isArchived) "Restore to Inbox" else "Archive")
             }
 
-            // Cloud save button
             if (isSignedIn && item.cloudId.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
 
                 Button(
                     onClick = onSaveToCloud,
@@ -276,15 +262,12 @@ fun SaveItemCard(
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Text(
-                        text = if (isSavingToCloud) {
-                            "Saving to cloud..."
-                        } else {
-                            "☁ Save to cloud"
-                        }
+                        if (isSavingToCloud) "Saving to cloud..."
+                        else "☁ Save to cloud"
                     )
                 }
             } else if (!item.cloudId.isNullOrBlank()) {
-                Spacer(modifier = Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
 
                 Text(
                     text = "☁ Saved to cloud",
@@ -295,12 +278,9 @@ fun SaveItemCard(
         }
     }
 
-    // TRUE FULLSCREEN IMAGE VIEWER
-    if (showFullImage) {
+    if (showFullImage && isImage && imageExists) {
         Dialog(
-            onDismissRequest = {
-                showFullImage = false
-            },
+            onDismissRequest = { showFullImage = false },
             properties = DialogProperties(
                 usePlatformDefaultWidth = false,
                 decorFitsSystemWindows = false
@@ -311,25 +291,18 @@ fun SaveItemCard(
                     .fillMaxSize()
                     .background(Color.Black)
             ) {
-                // Image fills the entire screen.
                 AsyncImage(
-                    model = item.content,
+                    model = imageModel(item.content),
                     contentDescription = item.title,
                     modifier = Modifier.fillMaxSize(),
                     contentScale = ContentScale.Fit
                 )
 
-                // Close button in the top-right corner.
                 IconButton(
-                    onClick = {
-                        showFullImage = false
-                    },
+                    onClick = { showFullImage = false },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .padding(
-                            top = 36.dp,
-                            end = 16.dp
-                        )
+                        .padding(top = 36.dp, end = 16.dp)
                         .background(
                             color = Color.DarkGray.copy(alpha = 0.75f),
                             shape = RoundedCornerShape(50)
