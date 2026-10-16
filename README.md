@@ -134,11 +134,11 @@ com.example.recollect/
 
 ## APK Download
 
-Download the Recollect APK using the Google Drive link below:
+Download and install the Recollect Android application using the link below.
 
-**[Download Recollect APK]([(https://drive.google.com/file/d/1YLfM0QMJz5TVAbKGbEyObD55wizafQki/view?usp=drive_link))**
+**[Download Recollect APK](https://drive.google.com/file/d/1YLfM0QMJz5TVAbKGbEyObD55wizafQki/view?usp=drive_link)**
 
-Make sure the Drive file's sharing permissions allow the reviewers to access the APK.
+
 
 ## Technical Decisions
 
