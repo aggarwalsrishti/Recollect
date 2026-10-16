@@ -120,9 +120,3 @@ com.example.recollect/
 - Image sharing and image saving rely on URI access provided by Android. Access to an image may depend on whether the URI permission remains valid.
 - Cloud functionality requires a correctly configured Firebase project and appropriate Firestore security rules.
 - Conflict resolution during simultaneous edits across devices is limited and may not cover every possible synchronization scenario.
-
-## Submission
-
-- **Project:** Recollect
-- **Repository:** <YOUR_GITHUB_REPOSITORY_URL>
-- **Task:** BYTE MAIT App Development Recruitment Task
