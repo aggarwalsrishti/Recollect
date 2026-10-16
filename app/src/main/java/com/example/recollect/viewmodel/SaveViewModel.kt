@@ -1,4 +1,3 @@
-
 package com.example.recollect.viewmodel
 
 import android.app.Application
@@ -36,22 +35,22 @@ class SaveViewModel(
     private val _statusMessage = MutableStateFlow("")
     val statusMessage = _statusMessage.asStateFlow()
 
-    private val authListener =
-        FirebaseAuth.AuthStateListener { firebaseAuth ->
-            val uid = firebaseAuth.currentUser?.uid ?: "LOCAL"
-            ownerUid.value = uid
+    private val authListener = FirebaseAuth.AuthStateListener { firebaseAuth ->
+        val uid = firebaseAuth.currentUser?.uid ?: "LOCAL"
+        ownerUid.value = uid
 
-            if (uid != "LOCAL") {
-                viewModelScope.launch {
-                    try {
-                        repository.assignUnownedItems(uid)
-                    } catch (e: Exception) {
-                        _statusMessage.value =
-                            e.message ?: "Could not load local items."
-                    }
+        if (uid != "LOCAL") {
+            viewModelScope.launch {
+                try {
+                    repository.assignUnownedItems(uid)
+                    syncPendingItems()
+                } catch (e: Exception) {
+                    _statusMessage.value =
+                        "Could not prepare sync: ${e.message ?: "Please try again."}"
                 }
             }
         }
+    }
 
     init {
         auth.addAuthStateListener(authListener)
@@ -61,9 +60,10 @@ class SaveViewModel(
             viewModelScope.launch {
                 try {
                     repository.assignUnownedItems(uid)
+                    syncPendingItems()
                 } catch (e: Exception) {
                     _statusMessage.value =
-                        e.message ?: "Could not prepare local items."
+                        "Could not prepare local items: ${e.message ?: "Please try again."}"
                 }
             }
         }
@@ -79,6 +79,13 @@ class SaveViewModel(
             emptyList()
         )
 
+    companion object {
+        private const val SYNCED = "SYNCED"
+        private const val PENDING = "PENDING"
+        private const val FAILED = "FAILED"
+        private const val LOCAL = "LOCAL"
+    }
+
     fun addItem(
         title: String,
         content: String,
@@ -87,36 +94,36 @@ class SaveViewModel(
         cloud: Boolean
     ) {
         viewModelScope.launch {
-            val uid = auth.currentUser?.uid ?: "LOCAL"
+            val uid = auth.currentUser?.uid ?: LOCAL
 
-            var item = SaveItem(
+            // Save to Room before attempting any network operation.
+            val item = SaveItem(
                 title = title,
                 content = content,
                 type = type,
                 tags = tags,
-                ownerUid = uid
+                ownerUid = uid,
+                syncStatus = if (cloud) PENDING else SYNCED
             )
 
-            if (cloud && uid != "LOCAL") {
-                try {
-                    val cloudId = cloudRepository.saveItem(item)
-                    item = item.copy(cloudId = cloudId)
-                    _statusMessage.value = "Item saved locally and to cloud."
-                } catch (e: Exception) {
-                    _statusMessage.value =
-                        "Saved locally, but cloud upload failed: " +
-                                (e.message ?: "Please try again.")
-                }
-            } else {
-                _statusMessage.value =
-                    if (uid == "LOCAL" && cloud) {
-                        "Saved locally. Sign in to upload it to cloud."
-                    } else {
-                        "Saved locally."
-                    }
-            }
+            try {
+                val generatedId = repository.insert(item)
+                val savedItem = item.copy(id = generatedId.toInt())
 
-            repository.insert(item)
+                if (cloud && uid != LOCAL) {
+                    _statusMessage.value =
+                        "Saved locally. Syncing to cloud…"
+                    syncPendingItems()
+                } else if (cloud) {
+                    _statusMessage.value =
+                        "Saved locally. Sign in to sync this item."
+                } else {
+                    _statusMessage.value = "Saved locally."
+                }
+            } catch (e: Exception) {
+                _statusMessage.value =
+                    "Could not save item locally: ${e.message ?: "Please try again."}"
+            }
         }
     }
 
@@ -133,38 +140,56 @@ class SaveViewModel(
                 content = content,
                 type = type,
                 tags = tags,
-                updatedAt = System.currentTimeMillis()
+                updatedAt = System.currentTimeMillis(),
+                syncStatus = if (
+                    !item.cloudId.isNullOrBlank() ||
+                    item.syncStatus == PENDING ||
+                    item.syncStatus == FAILED
+                ) PENDING else SYNCED
             )
 
-            repository.update(updatedItem)
-
-            if (!updatedItem.cloudId.isNullOrBlank()) {
-                try {
-                    cloudRepository.saveItem(updatedItem)
-                    _statusMessage.value = "Item updated locally and in cloud."
-                } catch (e: Exception) {
-                    _statusMessage.value =
-                        "Item updated locally, but cloud update failed."
-                }
-            } else {
+            try {
+                repository.update(updatedItem)
                 _statusMessage.value = "Item updated locally."
+
+                if (updatedItem.syncStatus == PENDING) {
+                    syncPendingItems()
+                }
+            } catch (e: Exception) {
+                _statusMessage.value =
+                    "Could not update item: ${e.message ?: "Please try again."}"
             }
         }
     }
 
     fun deleteItem(item: SaveItem) {
         viewModelScope.launch {
-            try {
-                if (!item.cloudId.isNullOrBlank()) {
-                    cloudRepository.deleteItem(item)
-                }
+            val uid = auth.currentUser?.uid ?: LOCAL
 
-                repository.delete(item)
-                _statusMessage.value = "Item deleted."
+            try {
+                if (item.cloudId.isNullOrBlank()) {
+                    // It has never been uploaded, so no cloud deletion is needed.
+                    repository.delete(item)
+                    _statusMessage.value = "Item deleted."
+                } else {
+                    // Keep a tombstone in Room until cloud deletion succeeds.
+                    val deletedItem = item.copy(
+                        isDeleted = true,
+                        updatedAt = System.currentTimeMillis(),
+                        syncStatus = PENDING
+                    )
+                    repository.update(deletedItem)
+
+                    if (uid != LOCAL) {
+                        syncPendingItems()
+                    } else {
+                        _statusMessage.value =
+                            "Deletion saved locally. Sign in to finish cloud deletion."
+                    }
+                }
             } catch (e: Exception) {
                 _statusMessage.value =
-                    "Could not delete item: " +
-                            (e.message ?: "Please try again.")
+                    "Could not delete item: ${e.message ?: "Please try again."}"
             }
         }
     }
@@ -173,70 +198,140 @@ class SaveViewModel(
         viewModelScope.launch {
             val updatedItem = item.copy(
                 isArchived = !item.isArchived,
-                updatedAt = System.currentTimeMillis()
+                updatedAt = System.currentTimeMillis(),
+                syncStatus = if (
+                    !item.cloudId.isNullOrBlank() ||
+                    item.syncStatus == PENDING ||
+                    item.syncStatus == FAILED
+                ) PENDING else SYNCED
             )
 
-            repository.update(updatedItem)
+            try {
+                repository.update(updatedItem)
 
-            if (!updatedItem.cloudId.isNullOrBlank()) {
-                try {
-                    cloudRepository.saveItem(updatedItem)
-                    _statusMessage.value =
-                        if (updatedItem.isArchived) {
-                            "Item archived."
-                        } else {
-                            "Item restored to inbox."
-                        }
-                } catch (e: Exception) {
-                    _statusMessage.value =
-                        "Changed locally, but cloud sync failed."
+                _statusMessage.value = if (updatedItem.isArchived) {
+                    "Item archived locally."
+                } else {
+                    "Item restored locally."
                 }
-            } else {
+
+                if (updatedItem.syncStatus == PENDING) {
+                    syncPendingItems()
+                }
+            } catch (e: Exception) {
                 _statusMessage.value =
-                    if (updatedItem.isArchived) {
-                        "Item archived locally."
-                    } else {
-                        "Item restored to inbox."
-                    }
+                    "Could not update archive status: ${e.message ?: "Please try again."}"
             }
         }
     }
 
-
     suspend fun saveItemToCloud(item: SaveItem): String {
         val uid = auth.currentUser?.uid
-            ?: throw IllegalStateException(
-                "Please sign in to save items to cloud."
-            )
+            ?: throw IllegalStateException("Please sign in to save items to cloud.")
 
         if (
             item.ownerUid.isNotBlank() &&
-            item.ownerUid != "LOCAL" &&
+            item.ownerUid != LOCAL &&
             item.ownerUid != uid
         ) {
-            throw IllegalStateException(
-                "You cannot upload another user's item."
-            )
+            throw IllegalStateException("You cannot upload another user's item.")
         }
 
-        // Create one timestamp and use it for both local and cloud data.
-        val itemForCloud = item.copy(
+        val pendingItem = item.copy(
             ownerUid = uid,
-            updatedAt = System.currentTimeMillis()
+            updatedAt = System.currentTimeMillis(),
+            syncStatus = PENDING
         )
 
-        val cloudId = cloudRepository.saveItem(itemForCloud)
+        // Persist the pending change first.
+        repository.update(pendingItem)
+
+        val cloudId = cloudRepository.saveItem(pendingItem)
 
         repository.update(
-            itemForCloud.copy(cloudId = cloudId)
+            pendingItem.copy(
+                cloudId = cloudId,
+                syncStatus = SYNCED
+            )
         )
 
         val result = "Saved \"${item.title}\" to cloud successfully."
         _statusMessage.value = result
-
         return result
     }
 
+    /**
+     * Public retry entry point.
+     * Call this after a connection is restored or from a Retry button.
+     */
+    fun retryPendingSync() {
+        viewModelScope.launch {
+            syncPendingItems()
+        }
+    }
+
+    /**
+     * Processes pending uploads, updates and deletions.
+     * Failed operations remain in Room for another attempt.
+     */
+    private suspend fun syncPendingItems() {
+        val uid = auth.currentUser?.uid ?: return
+
+        try {
+            repository.assignUnownedItems(uid)
+            val pendingItems = repository.getPendingItems(uid)
+
+            if (pendingItems.isEmpty()) {
+                return
+            }
+
+            var succeeded = 0
+            var failed = 0
+
+            for (item in pendingItems) {
+                try {
+                    if (item.isDeleted) {
+                        if (!item.cloudId.isNullOrBlank()) {
+                            cloudRepository.deleteItem(item)
+                        }
+
+                        repository.deleteById(item.id, uid)
+                    } else {
+                        val cloudId = cloudRepository.saveItem(item)
+
+                        repository.update(
+                            item.copy(
+                                cloudId = cloudId,
+                                ownerUid = uid,
+                                syncStatus = SYNCED
+                            )
+                        )
+                    }
+
+                    succeeded++
+                } catch (e: Exception) {
+                    repository.updateSyncStatus(
+                        itemId = item.id,
+                        uid = uid,
+                        status = FAILED
+                    )
+                    failed++
+                }
+            }
+
+            _statusMessage.value = when {
+                failed == 0 ->
+                    "Sync complete. $succeeded item(s) synced."
+                succeeded == 0 ->
+                    "Sync failed for $failed item(s). Your local changes are saved; retry when connected."
+                else ->
+                    "$succeeded item(s) synced; $failed failed and will need retrying."
+            }
+        } catch (e: Exception) {
+            _statusMessage.value =
+                "Sync could not run: ${e.message ?: "Check your connection and retry."}"
+        }
+    }
 
     suspend fun refreshCloudItems(): String {
         val uid = auth.currentUser?.uid
@@ -245,7 +340,7 @@ class SaveViewModel(
         repository.assignUnownedItems(uid)
 
         val cloudItems = cloudRepository.getItems()
-        val localItems = repository.getAllItems(uid).first()
+        val localItems = repository.getAllItemsOnce(uid)
 
         var added = 0
         var updated = 0
@@ -255,28 +350,42 @@ class SaveViewModel(
                 it.cloudId == cloudItem.cloudId
             }
 
-
             if (existing == null) {
                 repository.insert(cloudItem)
                 added++
-            } else {
-                val contentChanged =
-                    existing.title != cloudItem.title ||
-                            existing.content != cloudItem.content ||
-                            existing.type != cloudItem.type ||
-                            existing.tags != cloudItem.tags ||
-                            existing.isArchived != cloudItem.isArchived
-
-                if (contentChanged) {
-                    repository.update(
-                        cloudItem.copy(id = existing.id)
-                    )
-                    updated++
-                }
+                continue
             }
 
+            // Never replace a pending or failed local edit with cloud data.
+            if (
+                existing.syncStatus == PENDING ||
+                existing.syncStatus == FAILED ||
+                existing.isDeleted
+            ) {
+                continue
+            }
+
+            val cloudIsNewer = cloudItem.updatedAt > existing.updatedAt
+
+            if (cloudIsNewer) {
+                repository.update(
+                    cloudItem.copy(
+                        id = existing.id,
+                        syncStatus = SYNCED,
+                        isDeleted = false
+                    )
+                )
+                updated++
+            } else if (existing.updatedAt > cloudItem.updatedAt) {
+                // Local copy is newer; queue it for upload.
+                repository.update(
+                    existing.copy(syncStatus = PENDING)
+                )
+            }
         }
 
+        // Try to send any local changes discovered during refresh.
+        syncPendingItems()
 
         val result = "Cloud refresh complete: $added added, $updated updated."
         _statusMessage.value = result

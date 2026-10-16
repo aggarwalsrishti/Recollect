@@ -214,6 +214,22 @@ fun SaveScreen(
                 )
             }
 
+            Spacer(Modifier.height(8.dp))
+
+            // Retry pending or failed cloud synchronization.
+            if (user != null) {
+                OutlinedButton(
+                    onClick = {
+                        viewModel.retryPendingSync()
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Retry Sync")
+                }
+
+                Spacer(Modifier.height(8.dp))
+            }
+
             // Status message from the ViewModel.
             if (statusMessage.isNotBlank()) {
                 Text(

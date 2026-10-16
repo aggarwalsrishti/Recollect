@@ -15,5 +15,11 @@ data class SaveItem(
     val updatedAt: Long = System.currentTimeMillis(),
     val isArchived: Boolean = false,
     val ownerUid: String = "",
-    val cloudId: String? = null
+    val cloudId: String? = null,
+
+    // SYNCED, PENDING, or FAILED
+    val syncStatus: String = "SYNCED",
+
+    // Keep deleted cloud items until their deletion syncs.
+    val isDeleted: Boolean = false
 )

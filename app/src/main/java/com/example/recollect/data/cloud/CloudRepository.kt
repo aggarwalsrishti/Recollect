@@ -1,4 +1,3 @@
-
 package com.example.recollect.data.cloud
 
 import com.example.recollect.data.room_database.SaveItem
@@ -24,7 +23,8 @@ class CloudRepository {
     suspend fun saveItem(item: SaveItem): String {
         val uid = currentUid()
 
-        if (item.ownerUid.isNotBlank() &&
+        if (
+            item.ownerUid.isNotBlank() &&
             item.ownerUid != "LOCAL" &&
             item.ownerUid != uid
         ) {
@@ -51,7 +51,6 @@ class CloudRepository {
         )
 
         document.set(data).await()
-
         return document.id
     }
 
@@ -72,7 +71,9 @@ class CloudRepository {
                     ?: System.currentTimeMillis(),
                 isArchived = document.getBoolean("isArchived") ?: false,
                 ownerUid = uid,
-                cloudId = document.id
+                cloudId = document.id,
+                syncStatus = "SYNCED",
+                isDeleted = false
             )
         }.sortedByDescending { it.updatedAt }
     }
